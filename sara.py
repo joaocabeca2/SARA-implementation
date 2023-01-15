@@ -6,67 +6,87 @@ class SARA(IR2A):
 
     def __init__(self, id):
         IR2A.__init__(self,id)
-        self.throughputs = []
+        #self.throughputs = []
         self.qi = []
         self.segments_size = []
         self.request_time = 0
         self.hn = 1 #media harmonica
-        self.bcurr = 0 # ocupaçao do buffer
-        self.bmax = self.whiteboard.get_max_buffer_size()
+        self.bcurr = 0 #Current buffer occupancy in seconds
+        self.weight = 1
+        self.segment_size = None
+        self.index_segment = None #Segment number of the most recent download
+        self.current_qi = 0 #Bitrate of the most recently downloaded segment
         
     #requisições são movidas de cima para baixo
     def handle_xml_request(self, msg):
-        self.request_time = time.perf_counter()
         self.send_down(msg)
         
     #respostas são movidas de baixo para cima
     def handle_xml_response(self, msg):
         parsed_mpd = parse_mpd(msg.get_payload())
         self.qi = parsed_mpd.get_qi()
-
-        #tempo de do envio do request ate receber a resposta
-        t = time.perf_counter() - self.request_time
-
         self.send_up(msg)
     
     def handle_segment_size_request(self, msg):
-        selected_qi = self.qi[0]
         self.bcurr = self.whiteboard.get_amount_video_to_play()
-        beta = self.bmax * 0.8
-        balfa = self.bmax * 0.4
-        i = self.bmax * 0.15
+        bmax = self.whiteboard.get_max_buffer_size()
+        beta = bmax * 0.8
+        balfa = bmax * 0.4
+        i = bmax * 0.15
 
         self.request_time = time.perf_counter()
 
         #FAST START
         if self.bcurr <= i:
-            selected_id = min(self.qi)
-        else:
+            self.current_qi = 0
+            print('==========FAST START============')
+
+        #ADDITIVE INCREASE
+        elif self.bcurr <= balfa and self.bcurr > i:
+            if self.qi[self.current_qi] != self.qi[-1]:
+                self.current_qi += 1
+                print('==========ADDITIVE INCREASE============')
+                
+        #AGRESSIVE SWITCHING
+        elif self.bcurr > balfa and self.bcurr <= beta:
+            self.agressive_switching()
+            print('==========AGRESSIVE SWITCHING============')
+
+        #DELAYED DOWNLOAD
+        elif self.bcurr > beta and self.bcurr <= bmax:
             pass
-        
-        msg.add_quality_id(selected_id)
+        msg.add_quality_id(self.qi[self.current_qi])
 
         self.send_down(msg)
     
     def handle_segment_size_response(self, msg):
         #tempo de do envio do request ate receber a resposta
         t = time.perf_counter() - self.request_time
-        segment_size = msg.get_bit_length()
+        self.segment_size = msg.get_bit_length()
+        self.weight = self.segment_size//10000
 
-        print('BUFFER SIZE',self.bcurr)
-        print('MAXIMO BUFFER',self.bmax)
-        print('MEDIA HARMONICA',self.hn)
-
-        self.throughputs.append(segment_size/t)
-        self.segments_size.append(segment_size) 
-        self.hn += self.calculate_harmonic_mean(t,segment_size)
+        #self.throughputs.append(self.segment_size/t)
+        self.segments_size.append(self.segment_size) 
+        self.hn = self.calculate_harmonic_mean(t)
 
         self.send_up(msg)
     
-    def calculate_harmonic_mean(self,t,segment_size):
-        wi = segment_size*len(self.segments_size)+1
-        di = segment_size*(len(self.segments_size)/t)
-        return wi/di
+    def calculate_harmonic_mean(self,t):
+        dividend = 0
+        divider = 0
+        for segment in self.segments_size:
+            dividend += self.weight
+            divider += self.weight/(segment/t)
+        return dividend/divider
+    
+    def agressive_switching(self):
+        rate = 0
+        for index in range(len(self.qi[self.current:])):
+            if self.qi[index] >= self.hn:
+                x = self.hn - self.qi[index]
+                if x <= rate:
+                    rate = x
+                    self.current_qi = index
 
     def initialize(self):
         pass
