@@ -63,7 +63,7 @@ class SARA(IR2A):
         #tempo de do envio do request ate receber a resposta
         t = time.perf_counter() - self.request_time
         self.segment_size = msg.get_bit_length()
-        self.weight = self.segment_size//10000
+        self.weight = self.segment_size//1000
 
         #self.throughputs.append(self.segment_size/t)
         self.segments_size.append(self.segment_size) 
@@ -76,12 +76,13 @@ class SARA(IR2A):
         divider = 0
         for segment in self.segments_size:
             dividend += self.weight
-            divider += self.weight/(segment/t)
+            divider += (self.weight*segment)/(segment/t)
+        print(f'{self.weight}*{segment}/{segment}/{t}')
         return dividend/divider
     
     def agressive_switching(self):
         rate = 0
-        for index in range(len(self.qi[self.current:])):
+        for index in range(len(self.qi[self.current_qi:])):
             if self.qi[index] >= self.hn:
                 x = self.hn - self.qi[index]
                 if x <= rate:
