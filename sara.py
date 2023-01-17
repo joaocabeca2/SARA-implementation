@@ -12,7 +12,7 @@ class SARA(IR2A):
         self.request_time = 0
         self.hn = 1 #media harmonica
         self.bcurr = 0 #Current buffer occupancy in seconds
-        self.weight = 1
+        #self.weight = 1
         self.segment_size = None
         self.index_segment = None #Segment number of the most recent download
         self.current_qi = 0 #Bitrate of the most recently downloaded segment
@@ -63,7 +63,7 @@ class SARA(IR2A):
         #tempo de do envio do request ate receber a resposta
         t = time.perf_counter() - self.request_time
         self.segment_size = msg.get_bit_length()
-        self.weight = self.segment_size//1000
+        #self.weight = self.segment_size/1000
 
         #self.throughputs.append(self.segment_size/t)
         self.segments_size.append(self.segment_size) 
@@ -75,9 +75,10 @@ class SARA(IR2A):
         dividend = 0
         divider = 0
         for segment in self.segments_size:
-            dividend += self.weight
-            divider += (self.weight*segment)/(segment/t)
-        print(f'{self.weight}*{segment}/{segment}/{t}')
+            if segment != 0:
+                weight = segment/1000
+                dividend += weight
+                divider += (weight*segment)/(segment/t)
         return dividend/divider
     
     def agressive_switching(self):
