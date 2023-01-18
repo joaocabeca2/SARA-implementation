@@ -12,8 +12,8 @@ class SARA(IR2A):
         self.request_time = 0
         self.hn = 1 #media harmonica
         self.bcurr = 0 #Current buffer occupancy in seconds
-        #self.weight = 1
-        self.segment_size = None
+        self.weight = None
+        self.segment_size = 1
         self.index_segment = None #Segment number of the most recent download
         self.current_qi = 0 #Bitrate of the most recently downloaded segment
         
@@ -36,25 +36,29 @@ class SARA(IR2A):
 
         self.request_time = time.perf_counter()
 
+        size_estimated = self.segment_size/self.hn
         #FAST START
         if self.bcurr <= i:
             self.current_qi = 0
             print('==========FAST START============')
+        else:
+            if size_estimated > self.bcurr - i:
+                self.fast_start(size_estimated)
+                print('==========FAST START2============')
+            #ADDITIVE INCREASE
+            elif self.bcurr <= balfa:
+                if size_estimated < self.bcurr - i:
+                    if self.qi[self.current_qi] != self.qi[-1]:
+                        self.current_qi += 1
+                        print('==========ADDITIVE INCREASE============')
+            #AGRESSIVE SWITCHING
+            elif self.bcurr > balfa and self.bcurr <= beta:
+                self.agressive_switching()
+                print('==========AGRESSIVE SWITCHING============')
 
-        #ADDITIVE INCREASE
-        elif self.bcurr <= balfa and self.bcurr > i:
-            if self.qi[self.current_qi] != self.qi[-1]:
-                self.current_qi += 1
-                print('==========ADDITIVE INCREASE============')
-                
-        #AGRESSIVE SWITCHING
-        elif self.bcurr > balfa and self.bcurr <= beta:
-            self.agressive_switching()
-            print('==========AGRESSIVE SWITCHING============')
-
-        #DELAYED DOWNLOAD
-        elif self.bcurr > beta and self.bcurr <= bmax:
-            pass
+            #DELAYED DOWNLOAD
+            elif self.bcurr > beta and self.bcurr <= bmax:
+                pass
         msg.add_quality_id(self.qi[self.current_qi])
 
         self.send_down(msg)
@@ -63,7 +67,7 @@ class SARA(IR2A):
         #tempo de do envio do request ate receber a resposta
         t = time.perf_counter() - self.request_time
         self.segment_size = msg.get_bit_length()
-        #self.weight = self.segment_size/1000
+        self.weight = self.segment_size/1000
 
         #self.throughputs.append(self.segment_size/t)
         self.segments_size.append(self.segment_size) 
@@ -78,7 +82,7 @@ class SARA(IR2A):
             if segment != 0:
                 weight = segment/1000
                 dividend += weight
-                divider += (weight*segment)/(segment/t)
+                divider += (weight)/(segment/t)
         return dividend/divider
     
     def agressive_switching(self):
@@ -86,6 +90,15 @@ class SARA(IR2A):
         for index in range(len(self.qi[self.current_qi:])):
             if self.qi[index] >= self.hn:
                 x = self.hn - self.qi[index]
+                if x <= rate:
+                    rate = x
+                    self.current_qi = index
+
+    def fast_start(self,size_estimated):
+        rate = 0
+        for index in range(len(self.qi)):
+            if self.qi[index] <= size_estimated:
+                x = size_estimated - self.qi[index]
                 if x <= rate:
                     rate = x
                     self.current_qi = index
