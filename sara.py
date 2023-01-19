@@ -6,7 +6,7 @@ class SARA(IR2A):
 
     def __init__(self, id):
         IR2A.__init__(self,id)
-        #self.throughputs = []
+        self.throughputs = []
         self.qi = []
         self.segments_size = []
         self.request_time = 0
@@ -19,24 +19,32 @@ class SARA(IR2A):
         
     #requisições são movidas de cima para baixo
     def handle_xml_request(self, msg):
+        self.request_time = time.perf_counter()
         self.send_down(msg)
         
     #respostas são movidas de baixo para cima
     def handle_xml_response(self, msg):
         parsed_mpd = parse_mpd(msg.get_payload())
+        t = time.perf_counter() - self.request_time
+        self.segment_size = msg.get_bit_length()
+
         self.qi = parsed_mpd.get_qi()
+        
+        self.weight = self.segment_size/1000
+        self.throughputs.append(self.segment_size/t)
+        self.segments_size.append(self.segment_size)
+        self.hn = self.calculate_harmonic_mean(t)
         self.send_up(msg)
     
     def handle_segment_size_request(self, msg):
+        self.request_time = time.perf_counter()
         self.bcurr = self.whiteboard.get_amount_video_to_play()
         bmax = self.whiteboard.get_max_buffer_size()
         beta = bmax * 0.8
         balfa = bmax * 0.4
         i = bmax * 0.15
 
-        self.request_time = time.perf_counter()
-
-        size_estimated = self.segment_size/self.hn
+        size_estimated = (self.segment_size/1000)/self.hn
         #FAST START
         if self.bcurr <= i:
             self.current_qi = 0
@@ -66,23 +74,17 @@ class SARA(IR2A):
     def handle_segment_size_response(self, msg):
         #tempo de do envio do request ate receber a resposta
         t = time.perf_counter() - self.request_time
-        self.segment_size = msg.get_bit_length()
-        self.weight = self.segment_size/1000
-
-        #self.throughputs.append(self.segment_size/t)
-        self.segments_size.append(self.segment_size) 
-        self.hn = self.calculate_harmonic_mean(t)
-
+    
         self.send_up(msg)
     
     def calculate_harmonic_mean(self,t):
         dividend = 0
         divider = 0
-        for segment in self.segments_size:
-            if segment != 0:
-                weight = segment/1000
-                dividend += weight
-                divider += (weight)/(segment/t)
+        for index in range(len(self.segments_size)) :
+            if self.segments_size[index] != 0:
+                #weight = self.segments_size[index]/1000
+                dividend += self.segments_size[index]
+                divider += self.segments_size[index]/(self.throughputs[index])
         return dividend/divider
     
     def agressive_switching(self):
