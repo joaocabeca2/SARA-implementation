@@ -99,9 +99,9 @@ class SARA(IR2A):
     def fast_start(self,size_estimated):
         rate = 0
         for index in range(len(self.qi)):
-            if self.qi[index] <= size_estimated:
-                x = size_estimated - self.qi[index]
-                if x <= rate:
+            if self.qi[index] >= size_estimated:
+                x = self.qi[index] - size_estimated
+                if rate <= x:
                     rate = x
                     self.current_qi = index
 
