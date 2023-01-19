@@ -40,11 +40,11 @@ class SARA(IR2A):
         self.request_time = time.perf_counter()
         self.bcurr = self.whiteboard.get_amount_video_to_play()
         bmax = self.whiteboard.get_max_buffer_size()
-        beta = bmax * 0.8
-        balfa = bmax * 0.4
-        i = bmax * 0.15
+        beta = bmax * 0.79
+        balfa = bmax * 0.37
+        i = bmax * 0.105
 
-        size_estimated = (self.segment_size/1000)/self.hn
+        size_estimated = self.segment_size/self.hn
         #FAST START
         if self.bcurr <= i:
             self.current_qi = 0
