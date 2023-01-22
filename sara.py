@@ -8,13 +8,11 @@ class SARA(IR2A):
         IR2A.__init__(self,id)
         self.throughputs = []
         self.qi = []
-        self.segments_size = []
         self.request_time = 0
         self.hn = 1 #media harmonica
         self.bcurr = 0 #Current buffer occupancy in seconds
-        self.weight = None
+        self.weight = 0
         self.segment_size = 1
-        self.index_segment = None #Segment number of the most recent download
         self.current_qi = 0 #Bitrate of the most recently downloaded segment
         
     #requisições são movidas de cima para baixo
@@ -27,12 +25,13 @@ class SARA(IR2A):
         parsed_mpd = parse_mpd(msg.get_payload())
         t = time.perf_counter() - self.request_time
         self.segment_size = msg.get_bit_length()
+        self.weight += 1
 
         self.qi = parsed_mpd.get_qi()
         
-        self.weight = self.segment_size/1000
+        #self.weight = self.segment_size/1000
         self.throughputs.append(self.segment_size/t)
-        self.segments_size.append(self.segment_size)
+        #self.segments_size.append(self.segment_size)
         self.hn = self.calculate_harmonic_mean(t)
         self.send_up(msg)
     
@@ -80,12 +79,10 @@ class SARA(IR2A):
     def calculate_harmonic_mean(self,t):
         dividend = 0
         divider = 0
-        for index in range(len(self.segments_size)) :
-            if self.segments_size[index] != 0:
-                #weight = self.segments_size[index]/1000
-                dividend += self.segments_size[index]
-                divider += self.segments_size[index]/(self.throughputs[index])
-        return dividend/divider
+        for index in range(self.weight):
+            dividend += index+1
+            divider += (index+1)/self.throughputs[index] 
+        return dividend/divider           
     
     def agressive_switching(self):
         rate = 0
