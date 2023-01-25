@@ -38,7 +38,7 @@ class SARA(IR2A):
         #FAST START
         if self.bcurr <= i:
             self.next_qi = 0
-            print('==========FAST START============')
+            print('\n==========FAST START============\n')
     
         #ADDITIVE INCREASE
         elif self.bcurr > i and self.bcurr < balfa:
@@ -47,23 +47,21 @@ class SARA(IR2A):
                     self.next_qi += 1 if self.qi[self.next_qi] != self.qi[-1] else 0
                 else: 
                     self.next_qi = self.choose_better_bitrate()
-                print('==========ADDITIVE INCREASE============')
+                print('\n==========ADDITIVE INCREASE============\n')
             except IndexError:
                 pass
         #AGRESSIVE SWITCHING
         elif self.bcurr > balfa and self.bcurr <= beta:
             self.next_qi = self.choose_better_bitrate()
-            self.next_qi += 1 if self.next_qi < 19 else 0 
-            print('==========AGRESSIVE SWITCHING============')
+            self.next_qi += 1 if self.qi[self.next_qi] < self.qi[-1] else 0 
+            print('\n==========AGRESSIVE SWITCHING============\n')
 
         #DELAYED DOWNLOAD
         elif self.bcurr > beta and self.bcurr <= bmax:
             self.next_qi = self.choose_better_bitrate()
             if self.bcurr > beta:
                 time.sleep(1)
-            pass
-        print('FODASE',self.qi[self.next_qi])
-        print(self.segment_info)
+            print('\n==========DELAYED DOWNLOAD============\n')
         msg.add_quality_id(self.qi[self.next_qi])
 
         self.send_down(msg)
@@ -76,18 +74,14 @@ class SARA(IR2A):
 
         if len(self.segment_info) > 5:
             self.segment_info.pop(0)
+
         #realizar o calculo da média harmonica apenas quando haver no mínimo dois segmentos
         if len(self.segment_info) > 2:
             self.hn = self.calculate_harmonic_mean()
 
-        print(f"TEMPO {self.segment_size/t}")
-        print(f'TAMANHO SEGMENTO {self.segment_size}')
-        print(f'MEDIA HARMONICA {self.hn}')
-        #print(f'PROXIMO TAMANHO DE SEGMENTO {self.segment_size/self.hn}')
         self.send_up(msg)
     
     def calculate_harmonic_mean(self):
-        #dividend = 0
         divider = 0
         for index in range(len(self.segment_info)):
             try:
@@ -105,10 +99,7 @@ class SARA(IR2A):
             for index in range(len(self.qi)):
                 if self.qi[index] > self.hn:
                     return index            
-        
-    def agressive_switching(self):
-        pass
-
+    
     def initialize(self):
         pass
 
