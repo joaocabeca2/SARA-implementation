@@ -11,7 +11,7 @@ class SARA(IR2A):
         self.request_time = 0
         self.hn = None #media harmonica
         self.bcurr = 0 #Current buffer occupancy in seconds
-        self.segment_size = 1
+        self.segment_size = None
         self.next_qi = 0 #Bitrate of the most recently downloaded segment
         
     #requisições são movidas de cima para baixo
@@ -53,6 +53,7 @@ class SARA(IR2A):
         #AGRESSIVE SWITCHING
         elif self.bcurr > balfa and self.bcurr <= beta:
             self.next_qi = self.choose_better_bitrate()
+            self.next_qi += 1 if self.next_qi < 19 else 0 
             print('==========AGRESSIVE SWITCHING============')
 
         #DELAYED DOWNLOAD
@@ -103,8 +104,7 @@ class SARA(IR2A):
         else:
             for index in range(len(self.qi)):
                 if self.qi[index] > self.hn:
-                    return index
-            return self.next_qi             
+                    return index            
         
     def agressive_switching(self):
         pass
