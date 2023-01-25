@@ -42,20 +42,29 @@ class SARA(IR2A):
         #ADDITIVE INCREASE
         elif self.bcurr > i and self.bcurr < balfa:
             try:
-                if self.qi[self.next_qi] >= self.hn:
-                    self.next_qi += 1
+                if self.qi[self.next_qi] <= self.hn:
+                    self.next_qi += 1 if self.qi[self.next_qi] != self.qi[-1] else 0
                 else: 
-                    self.next_qi= self.choose_better_bitrate()
+                    self.next_qi = self.choose_better_bitrate()
                 print('==========ADDITIVE INCREASE============')
             except IndexError:
                 pass
         #AGRESSIVE SWITCHING
         elif self.bcurr > balfa and self.bcurr <= beta:
-            self.next_qi= self.choose_better_bitrate()
+            try:
+                if self.qi[self.next_qi] >= self.hn:
+                    self.next_qi += 1 if self.qi[self.next_qi] != self.qi[-1] else 0
+                else: 
+                    self.next_qi = self.choose_better_bitrate()
+            except IndexError:
+                pass
             print('==========AGRESSIVE SWITCHING============')
 
         #DELAYED DOWNLOAD
         elif self.bcurr > beta and self.bcurr <= bmax:
+            self.next_qi = self.choose_better_bitrate()
+            if self.bcurr > beta:
+                time.sleep(1)
             pass
         print('FODASE',self.qi[self.next_qi])
         print(self.segment_info)
@@ -67,9 +76,6 @@ class SARA(IR2A):
         #tempo de do envio do request ate receber a resposta
         t = time.perf_counter() - self.request_time
         self.segment_size = msg.get_bit_length()
-
-        if len(self.segment_info) > 5:
-            self.segment_info.pop(0)
 
         self.segment_info.append([self.segment_size,self.segment_size/t])
 
@@ -97,7 +103,7 @@ class SARA(IR2A):
         if self.hn < self.qi[0]:
             return 0
         elif self.hn > self.qi[-1]:
-            return -1
+            return 19
         else:
             for index in range(len(self.qi)):
                 if self.qi[index] > self.hn:
@@ -106,14 +112,6 @@ class SARA(IR2A):
         
     def agressive_switching(self):
         pass
-    '''def fast_start(self,bitrate_estimated):
-        if bitrate_estimated <= self.qi[0]:
-            return self.qi[0]
-        elif bitrate_estimated >= self.qi[-1]:
-            return self.qi[-1]
-        else:
-            for index in range(len(self.qi[self.next_qi:])):'''
-
 
     def initialize(self):
         pass
