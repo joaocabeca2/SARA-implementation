@@ -11,18 +11,19 @@ class SARA(IR2A):
         self.request_time = 0
         self.hn = None #media harmonica
         self.bcurr = 0 #Current buffer occupancy in seconds
-        self.segment_size = 1
+        self.segment_size = None
         self.next_qi = 0 #Bitrate of the most recently downloaded segment
         
     #requisições são movidas de cima para baixo
     def handle_xml_request(self, msg):
         self.request_time = time.perf_counter()
         self.send_down(msg)
-        
+
     #respostas são movidas de baixo para cima
     def handle_xml_response(self, msg):
         parsed_mpd = parse_mpd(msg.get_payload())
         t = time.perf_counter() - self.request_time
+        self.segment_info.append([msg.get_bit_length(),msg.get_bit_length()/t])
         self.qi = parsed_mpd.get_qi()
         self.send_up(msg)
     
@@ -34,31 +35,31 @@ class SARA(IR2A):
         balfa = bmax * 0.4
         i = bmax * 0.15
         
-        #FAST START
+        #ESTAGIOS SARA
         if self.bcurr <= i:
             self.next_qi = 0
-            print('==========FAST START============')
+            print('\n==========FAST START============\n')
     
-        #ADDITIVE INCREASE
         elif self.bcurr > i and self.bcurr < balfa:
             try:
-                if self.qi[self.next_qi] >= self.hn:
-                    self.next_qi += 1
+                if self.qi[self.next_qi] <= self.hn:
+                    self.next_qi += 1 if self.qi[self.next_qi] != self.qi[-1] else 0
                 else: 
-                    self.next_qi= self.choose_better_bitrate()
-                print('==========ADDITIVE INCREASE============')
+                    self.next_qi = self.choose_better_bitrate()
+                print('\n==========ADDITIVE INCREASE============\n')
             except IndexError:
                 pass
-        #AGRESSIVE SWITCHING
-        elif self.bcurr > balfa and self.bcurr <= beta:
-            self.next_qi= self.choose_better_bitrate()
-            print('==========AGRESSIVE SWITCHING============')
 
-        #DELAYED DOWNLOAD
+        elif self.bcurr > balfa and self.bcurr <= beta:
+            self.next_qi = self.choose_better_bitrate()
+            self.next_qi += 1 if self.qi[self.next_qi] < self.qi[-1] else 0 
+            print('\n==========AGRESSIVE SWITCHING============\n')
+
         elif self.bcurr > beta and self.bcurr <= bmax:
-            pass
-        print('FODASE',self.qi[self.next_qi])
-        print(self.segment_info)
+            self.next_qi = self.choose_better_bitrate()
+            if self.bcurr > beta:
+                time.sleep(1)
+            print('\n==========DELAYED DOWNLOAD============\n')
         msg.add_quality_id(self.qi[self.next_qi])
 
         self.send_down(msg)
@@ -67,24 +68,15 @@ class SARA(IR2A):
         #tempo de do envio do request ate receber a resposta
         t = time.perf_counter() - self.request_time
         self.segment_size = msg.get_bit_length()
-
-        if len(self.segment_info) > 5:
-            self.segment_info.pop(0)
-
         self.segment_info.append([self.segment_size,self.segment_size/t])
-
+        #reduzir a quantidade para apenas 5 vai deixar a media harmonica mais precisa
+        self.segment_info.pop(0) if len(self.segment_info) > 5 else 0
         #realizar o calculo da média harmonica apenas quando haver no mínimo dois segmentos
-        if len(self.segment_info) > 2:
-            self.hn = self.calculate_harmonic_mean()
-
-        print(f"TEMPO {self.segment_size/t}")
-        print(f'TAMANHO SEGMENTO {self.segment_size}')
-        print(f'MEDIA HARMONICA {self.hn}')
-        #print(f'PROXIMO TAMANHO DE SEGMENTO {self.segment_size/self.hn}')
+        self.hn = self.calculate_harmonic_mean() if len(self.segment_info) > 2 else None
+            
         self.send_up(msg)
     
     def calculate_harmonic_mean(self):
-        #dividend = 0
         divider = 0
         for index in range(len(self.segment_info)):
             try:
@@ -95,26 +87,13 @@ class SARA(IR2A):
 
     def choose_better_bitrate(self):
         if self.hn < self.qi[0]:
-            return 0
+            return 0 #pior qualidade
         elif self.hn > self.qi[-1]:
-            return -1
+            return 19 #melhor qualidade
         else:
             for index in range(len(self.qi)):
-                if self.qi[index] > self.hn:
-                    return index - 1
-            return self.next_qi             
-        
-    def agressive_switching(self):
-        pass
-    '''def fast_start(self,bitrate_estimated):
-        if bitrate_estimated <= self.qi[0]:
-            return self.qi[0]
-        elif bitrate_estimated >= self.qi[-1]:
-            return self.qi[-1]
-        else:
-            for index in range(len(self.qi[self.next_qi:])):'''
-
-
+               return index if self.qi[index] > self.hn else self.next_qi
+                                
     def initialize(self):
         pass
 
