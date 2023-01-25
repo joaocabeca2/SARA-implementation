@@ -23,6 +23,7 @@ class SARA(IR2A):
     def handle_xml_response(self, msg):
         parsed_mpd = parse_mpd(msg.get_payload())
         t = time.perf_counter() - self.request_time
+        self.segment_info.append([msg.get_bit_length(),msg.get_bit_length()/t])
         self.qi = parsed_mpd.get_qi()
         self.send_up(msg)
     
@@ -51,13 +52,7 @@ class SARA(IR2A):
                 pass
         #AGRESSIVE SWITCHING
         elif self.bcurr > balfa and self.bcurr <= beta:
-            try:
-                if self.qi[self.next_qi] >= self.hn:
-                    self.next_qi += 1 if self.qi[self.next_qi] != self.qi[-1] else 0
-                else: 
-                    self.next_qi = self.choose_better_bitrate()
-            except IndexError:
-                pass
+            self.next_qi = self.choose_better_bitrate()
             print('==========AGRESSIVE SWITCHING============')
 
         #DELAYED DOWNLOAD
@@ -76,9 +71,10 @@ class SARA(IR2A):
         #tempo de do envio do request ate receber a resposta
         t = time.perf_counter() - self.request_time
         self.segment_size = msg.get_bit_length()
-
         self.segment_info.append([self.segment_size,self.segment_size/t])
 
+        if len(self.segment_info) > 5:
+            self.segment_info.pop(0)
         #realizar o calculo da média harmonica apenas quando haver no mínimo dois segmentos
         if len(self.segment_info) > 2:
             self.hn = self.calculate_harmonic_mean()
@@ -107,7 +103,7 @@ class SARA(IR2A):
         else:
             for index in range(len(self.qi)):
                 if self.qi[index] > self.hn:
-                    return index - 1
+                    return index
             return self.next_qi             
         
     def agressive_switching(self):
