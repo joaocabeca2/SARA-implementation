@@ -6,5 +6,4 @@ utilizado para fazer o controle da reprodução de um video streaming conforme a
 - O objetivo desse trabalho foi fazer uma implementação na linguagem de programação python de um algoritmo ABR utilizando o código da implementação do protocolo MPEG-DASH: https://github.com/mfcaetano/pydash
 
 - Integrantes:
-João Pedro Felicio Pereira
-Jhuliana Valeria da Silva Santos
+João Pedro Felicio Pereira e Jhuliana Valeria da Silva Santos
