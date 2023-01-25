@@ -9,7 +9,7 @@ class SARA(IR2A):
         self.segment_info = []
         self.qi = []
         self.request_time = 0
-        self.hn = 1 #media harmonica
+        self.hn = None #media harmonica
         self.bcurr = 0 #Current buffer occupancy in seconds
         self.segment_size = 1
         self.next_qi = 0 #Bitrate of the most recently downloaded segment
@@ -29,34 +29,36 @@ class SARA(IR2A):
     def handle_segment_size_request(self, msg):
         self.request_time = time.perf_counter()
         self.bcurr = self.whiteboard.get_amount_video_to_play()
-        bmax = 12 #self.whiteboard.get_max_buffer_size()
+        bmax = self.whiteboard.get_max_buffer_size()
         beta = bmax * 0.8
         balfa = bmax * 0.4
-        i = 2
-
-        size_estimated = self.segment_size/self.hn
+        i = bmax * 0.15
+        
         #FAST START
         if self.bcurr <= i:
             self.next_qi = 0
             print('==========FAST START============')
-            '''else:
-                if size_estimated > self.bcurr - i:
-                    self.next_qi = self.bcurr
-                    print('==========FAST START2============')'''
-            #ADDITIVE INCREASE
-            #elif self.bcurr <= balfa:
-        if  self.bcurr > i and self.bcurr < balfa:
-            if self.qi[self.next_qi] != self.qi[-1]:
-                self.next_qi += 1
+    
+        #ADDITIVE INCREASE
+        elif self.bcurr > i and self.bcurr < balfa:
+            try:
+                if self.qi[self.next_qi] >= self.hn:
+                    self.next_qi += 1
+                else: 
+                    self.next_qi= self.choose_better_bitrate()
                 print('==========ADDITIVE INCREASE============')
+            except IndexError:
+                pass
         #AGRESSIVE SWITCHING
         elif self.bcurr > balfa and self.bcurr <= beta:
-            self.agressive_switching()
+            self.next_qi= self.choose_better_bitrate()
             print('==========AGRESSIVE SWITCHING============')
 
         #DELAYED DOWNLOAD
         elif self.bcurr > beta and self.bcurr <= bmax:
             pass
+        print('FODASE',self.qi[self.next_qi])
+        print(self.segment_info)
         msg.add_quality_id(self.qi[self.next_qi])
 
         self.send_down(msg)
@@ -78,18 +80,30 @@ class SARA(IR2A):
         print(f"TEMPO {self.segment_size/t}")
         print(f'TAMANHO SEGMENTO {self.segment_size}')
         print(f'MEDIA HARMONICA {self.hn}')
-        print(f'PROXIMO TAMANHO DE SEGMENTO {self.segment_size/self.hn}')
+        #print(f'PROXIMO TAMANHO DE SEGMENTO {self.segment_size/self.hn}')
         self.send_up(msg)
     
     def calculate_harmonic_mean(self):
-        dividend = 0
+        #dividend = 0
         divider = 0
         for index in range(len(self.segment_info)):
-            if self.segment_info[index][1] != 0:
-                dividend += self.segment_info[index][0]
-                divider += self.segment_info[index][0]/self.segment_info[index][1]
-        return dividend/divider           
-    
+            try:
+                divider += 1/self.segment_info[index][0]
+            except ZeroDivisionError:
+                pass
+        return len(self.segment_info)/divider 
+
+    def choose_better_bitrate(self):
+        if self.hn < self.qi[0]:
+            return 0
+        elif self.hn > self.qi[-1]:
+            return -1
+        else:
+            for index in range(len(self.qi)):
+                if self.qi[index] > self.hn:
+                    return index - 1
+            return self.next_qi             
+        
     def agressive_switching(self):
         pass
     '''def fast_start(self,bitrate_estimated):
