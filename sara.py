@@ -42,17 +42,14 @@ class SARA(IR2A):
     
         elif self.bcurr > i and self.bcurr < balfa:
             try:
-                if self.qi[self.next_qi] <= self.hn:
+                if self.qi[self.next_qi] < self.hn and self.next_qi:
                     self.next_qi += 1 if self.qi[self.next_qi] != self.qi[-1] else 0
-                else: 
-                    self.next_qi = self.choose_better_bitrate()
-                print('\n==========ADDITIVE INCREASE============\n')
             except IndexError:
                 pass
+            print('\n==========ADDITIVE INCREASE============\n')
 
         elif self.bcurr > balfa and self.bcurr <= beta:
             self.next_qi = self.choose_better_bitrate()
-            self.next_qi += 1 if self.qi[self.next_qi] < self.qi[-1] else 0 
             print('\n==========AGRESSIVE SWITCHING============\n')
 
         elif self.bcurr > beta and self.bcurr <= bmax:
@@ -60,6 +57,7 @@ class SARA(IR2A):
             if self.bcurr > beta:
                 time.sleep(1)
             print('\n==========DELAYED DOWNLOAD============\n')
+        
         msg.add_quality_id(self.qi[self.next_qi])
 
         self.send_down(msg)
@@ -69,8 +67,6 @@ class SARA(IR2A):
         t = time.perf_counter() - self.request_time
         self.segment_size = msg.get_bit_length()
         self.segment_info.append([self.segment_size,self.segment_size/t])
-        #reduzir a quantidade para apenas 5 vai deixar a media harmonica mais precisa
-        self.segment_info.pop(0) if len(self.segment_info) > 5 else 0
         #realizar o calculo da média harmonica apenas quando haver no mínimo dois segmentos
         self.hn = self.calculate_harmonic_mean() if len(self.segment_info) > 2 else None
             
@@ -80,7 +76,7 @@ class SARA(IR2A):
         divider = 0
         for index in range(len(self.segment_info)):
             try:
-                divider += 1/self.segment_info[index][0]
+                divider += 1/self.segment_info[index][1]
             except ZeroDivisionError:
                 pass
         return len(self.segment_info)/divider 
@@ -91,9 +87,11 @@ class SARA(IR2A):
         elif self.hn > self.qi[-1]:
             return 19 #melhor qualidade
         else:
+            parameters = []
             for index in range(len(self.qi)):
-               return index if self.qi[index] > self.hn else self.next_qi
-                                
+                parameters.append(abs(self.qi[index] - self.hn))
+            return parameters.index(min(parameters))
+
     def initialize(self):
         pass
 
