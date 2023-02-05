@@ -42,7 +42,7 @@ class SARA(IR2A):
     
         elif self.bcurr > i and self.bcurr < balfa:
             try:
-                if self.qi[self.next_qi] < self.hn and self.next_qi:
+                if self.qi[self.next_qi] < self.hn:
                     self.next_qi += 1 if self.qi[self.next_qi] != self.qi[-1] else 0
             except IndexError:
                 pass
